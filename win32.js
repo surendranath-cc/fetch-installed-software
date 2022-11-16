@@ -1,18 +1,29 @@
 const { exec, execSync } = require('child_process');
 
-const MAX_BUFFER_SIZE = 1024 * 5000;
+const MAX_BUFFER_SIZE = 1024 * 500000;
 
 const getQueryStringArray = () => {
     switch(process.arch) {
         case 'x64': return [
-            getWindowsCommandPath() + '\\REG QUERY HKLM\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s',
-            getWindowsCommandPath() + '\\REG QUERY HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s'
+            // getWindowsCommandPath() + '\\REG QUERY HKLM\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s',
+            // getWindowsCommandPath() + '\\REG QUERY HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s',
+            // getWindowsCommandPath() + '\\REG QUERY HKCR\\VirtualStore\\MACHINE\\SOFTWARE\\Wow6432Node\\ /s',
+            // getWindowsCommandPath() + '\\REG QUERY HKCU\\SOFTWARE\\Classes\\VirtualStore\\MACHINE\\SOFTWARE\\Wow6432Node\\ /s',
+            // getWindowsCommandPath() + '\\REG QUERY HKCU\\SOFTWARE\\ /s',
+            // getWindowsCommandPath() + '\\REG QUERY HKLM\\SOFTWARE\\Wow6432Node\\ /s'
+            // getWindowsCommandPath() + '\\REG QUERY HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s',
+
+            getWindowsCommandPath() + '\\REG QUERY HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s',
+            // getWindowsCommandPath() + '\\REG QUERY HKCU\\SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s',
+            getWindowsCommandPath() + '\\REG QUERY HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s',
+            getWindowsCommandPath() + '\\REG QUERY HKLM\\SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s'
         ];
         default: return [
             getWindowsCommandPath() + '\\REG QUERY HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ /s'
         ];
     }
 };
+
 
 const getWindowsCommandPath = () => {
     if (process.arch === 'ia32' && process.env.hasOwnProperty('PROCESSOR_ARCHITEW6432')) {
@@ -67,6 +78,32 @@ const getAllInstalledSoftwareSync = () => {
 const processCmdOutput = (fullList) => {
     const softwareList = [];
     fullList.split(/^HKEY_LOCAL_MACHINE/m).forEach((softwareBlock, index) => {
+        if(index==0) return;
+        const softwareObject = {};
+        let lastKey = '';
+        let lastValue = '';
+
+        const softwareLines = softwareBlock.split(/\r?\n/);
+        softwareObject['RegistryDirName'] = softwareLines.shift().match(/^(\\[^\\]+)*?\\([^\\]+)\s*$/)[2];
+        softwareLines.forEach(infoLine => {
+            if (infoLine.trim()) {
+                let infoTokens = infoLine.match(/^\s+(.+?)\s+REG_[^ ]+\s*(.*)/);
+                if (infoTokens) {
+                    infoTokens.shift();
+                    lastKey = infoTokens[0];
+                    lastValue = infoTokens[1];
+                } else {
+                    lastValue = lastValue + '\n' + infoLine;
+                }
+                softwareObject[lastKey] = lastValue;
+            }
+        });
+        if(softwareObject.DisplayName != undefined && softwareObject.DisplayName.indexOf('Elite') > -1){
+            console.log(softwareObject);
+        }
+        softwareList.push(softwareObject);
+    });
+    fullList.split(/^HKEY_CURRENT_USER/m).forEach((softwareBlock, index) => {
         if(index==0) return;
         const softwareObject = {};
         let lastKey = '';
